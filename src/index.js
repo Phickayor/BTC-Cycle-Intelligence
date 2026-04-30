@@ -6,9 +6,6 @@ const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/ser
 const { createContextMiddleware } = require("@ctxprotocol/sdk");
 const axios = require("axios");
 
-// Use the SAME zod instance that MCP SDK uses internally
-const { z } = require("./node_modules/@modelcontextprotocol/sdk/node_modules/zod/v3/index.js");
-
 const app = express();
 app.use(express.json());
 app.use(createContextMiddleware());
@@ -39,9 +36,7 @@ const OUTPUT_SCHEMA = {
   required: ["mvrv", "regimeScore", "cycleRegime", "entryRisk", "asOf"],
 };
 
-const inputSchema = z.object({
-  query: z.string().optional().describe("Optional query context"),
-});
+const inputSchema = {};
 
 async function fetchBTCMetrics() {
   const now = Date.now();
