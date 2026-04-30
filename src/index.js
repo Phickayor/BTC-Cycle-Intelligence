@@ -140,7 +140,7 @@ async function getCycleData() {
 
 function createServer() {
   const server = new McpServer({ name: "btc-cycle-intelligence", version: "1.0.0" });
-  const inputSchema = {};
+  const inputSchema = { type: "object", properties: {} };
 
   server.tool("get_btc_cycle_regime",
     "Returns the current Bitcoin market cycle regime using MVRV, exchange flows, and 30-day ROI. Answers: Where are we in the BTC cycle right now?",
