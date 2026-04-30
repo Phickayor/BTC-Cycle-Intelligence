@@ -1,0 +1,30 @@
+{
+  "name": "btc-cycle-intelligence",
+  "version": "1.0.0",
+  "description": "BTC Cycle Regime Intelligence MCP Server — MVRV, NUPL, SOPR composite scoring",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "keywords": [
+    "bitcoin",
+    "on-chain",
+    "mvrv",
+    "nupl",
+    "sopr",
+    "cycle",
+    "mcp"
+  ],
+  "author": "Phickayor",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@ctxprotocol/sdk": "^0.13.1",
+    "@modelcontextprotocol/sdk": "1.10.2",
+    "axios": "^1.15.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "zod": "3.23.8"
+  }
+}
