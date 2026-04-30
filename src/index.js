@@ -6,6 +6,9 @@ const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/ser
 const { createContextMiddleware } = require("@ctxprotocol/sdk");
 const axios = require("axios");
 
+// Use the SAME zod instance that MCP SDK uses internally
+const { z } = require("./node_modules/@modelcontextprotocol/sdk/node_modules/zod/v3/index.js");
+
 const app = express();
 app.use(express.json());
 app.use(createContextMiddleware());
@@ -25,16 +28,20 @@ const OUTPUT_SCHEMA = {
     regimeScore: { type: "number", description: "Composite cycle score 0-100" },
     cycleRegime: { type: "string", description: "Current BTC cycle regime classification" },
     entryRisk: { type: "string", description: "Entry risk level: Low, Moderate, High, or Extreme" },
-    lthBehavior: { type: "string", description: "Long-term holder behavior: Accumulating, Distributing, or Neutral" },
+    lthBehavior: { type: "string", description: "Long-term holder behavior" },
     historicalContext: { type: "string", description: "Historical cycle comparison" },
     impliedPositioning: { type: "string", description: "Implied positioning guidance" },
-    sourceRefs: { type: "array", items: { type: "string" }, description: "Data source references" },
+    sourceRefs: { type: "array", items: { type: "string" } },
     asOf: { type: "string", description: "Data freshness date" },
     confidence: { type: "number", description: "Confidence score 0-1" },
     stale: { type: "boolean", description: "Whether data is from stale cache" },
   },
   required: ["mvrv", "regimeScore", "cycleRegime", "entryRisk", "asOf"],
 };
+
+const inputSchema = z.object({
+  query: z.string().optional().describe("Optional query context"),
+});
 
 async function fetchBTCMetrics() {
   const now = Date.now();
@@ -140,7 +147,6 @@ async function getCycleData() {
 
 function createServer() {
   const server = new McpServer({ name: "btc-cycle-intelligence", version: "1.0.0" });
-  const inputSchema = { type: "object", properties: {} };
 
   server.tool("get_btc_cycle_regime",
     "Returns the current Bitcoin market cycle regime using MVRV, exchange flows, and 30-day ROI. Answers: Where are we in the BTC cycle right now?",
