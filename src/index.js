@@ -194,7 +194,7 @@ function formatResponse(toolName, data) {
   }
 }
 
-// Health check routes — keeps Railway awake
+// Health check routes - keeps Railway awake
 app.get("/", (req, res) => {
   res.json({ status: "ok", name: "btc-cycle-intelligence", version: "1.0.0" });
 });
@@ -263,5 +263,12 @@ app.post("/mcp", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => console.log(`BTC Cycle Intelligence MCP Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`BTC Cycle Intelligence MCP Server running on port ${PORT}`);
+  // Pre-warm cache on startup so first request is instant
+  fetchBTCMetrics()
+    .then(() => console.log("Cache pre-warmed successfully"))
+    .catch((err) => console.log("Cache pre-warm failed:", err.message));
+});
+
 module.exports = app;
