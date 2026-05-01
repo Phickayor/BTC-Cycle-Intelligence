@@ -1,8 +1,6 @@
 require("dotenv").config();
 
 const express = require("express");
-const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
-const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/server/streamableHttp.js");
 const { createContextMiddleware } = require("@ctxprotocol/sdk");
 const axios = require("axios");
 
@@ -36,7 +34,40 @@ const OUTPUT_SCHEMA = {
   required: ["mvrv", "regimeScore", "cycleRegime", "entryRisk", "asOf"],
 };
 
-const inputSchema = {};
+const INPUT_SCHEMA = { type: "object", properties: {}, required: [] };
+
+const TOOLS = [
+  {
+    name: "get_btc_cycle_regime",
+    description: "Returns the current Bitcoin market cycle regime using MVRV, exchange flows, and 30-day ROI. Answers: Where are we in the BTC cycle right now?",
+    inputSchema: INPUT_SCHEMA,
+    outputSchema: OUTPUT_SCHEMA,
+  },
+  {
+    name: "get_lth_behavior",
+    description: "Analyzes whether long-term Bitcoin holders are accumulating or distributing based on MVRV and exchange flow data.",
+    inputSchema: INPUT_SCHEMA,
+    outputSchema: OUTPUT_SCHEMA,
+  },
+  {
+    name: "get_entry_risk",
+    description: "Returns whether current BTC on-chain metrics suggest a high or low risk entry point.",
+    inputSchema: INPUT_SCHEMA,
+    outputSchema: OUTPUT_SCHEMA,
+  },
+  {
+    name: "compare_to_2021_top",
+    description: "Compares current BTC on-chain metrics to the 2021 cycle top readings.",
+    inputSchema: INPUT_SCHEMA,
+    outputSchema: OUTPUT_SCHEMA,
+  },
+  {
+    name: "get_nupl_sentiment",
+    description: "Returns current Bitcoin market sentiment using MVRV and exchange flow as proxy indicators.",
+    inputSchema: INPUT_SCHEMA,
+    outputSchema: OUTPUT_SCHEMA,
+  },
+];
 
 async function fetchBTCMetrics() {
   const now = Date.now();
@@ -140,82 +171,86 @@ async function getCycleData() {
   };
 }
 
-function createServer() {
-  const server = new McpServer({ name: "btc-cycle-intelligence", version: "1.0.0" });
+function formatResponse(toolName, data) {
+  const sentiment =
+    data.regimeScore >= 80 ? "Euphoria" :
+    data.regimeScore >= 65 ? "Belief" :
+    data.regimeScore >= 50 ? "Optimism" :
+    data.regimeScore >= 30 ? "Hope" : "Capitulation";
 
-  server.tool("get_btc_cycle_regime",
-    "Returns the current Bitcoin market cycle regime using MVRV, exchange flows, and 30-day ROI. Answers: Where are we in the BTC cycle right now?",
-    inputSchema,
-    async () => {
-      const data = await getCycleData();
-      return {
-        structuredContent: data,
-        content: [{ type: "text", text: `BTC Cycle Regime: ${data.cycleRegime} (Score: ${data.regimeScore}/100)\nMVRV: ${data.mvrv?.toFixed(2)} | Price: $${data.price?.toFixed(0)} | ROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nExchange Pressure: ${data.exchangePressure}\nEntry Risk: ${data.entryRisk}\nLTH Behavior: ${data.lthBehavior}\n${data.historicalContext}\nPositioning: ${data.impliedPositioning}\nData as of: ${data.asOf}` }],
-      };
-    }
-  );
-
-  server.tool("get_lth_behavior",
-    "Analyzes whether long-term Bitcoin holders are accumulating or distributing based on MVRV and exchange flow data.",
-    inputSchema,
-    async () => {
-      const data = await getCycleData();
-      return {
-        structuredContent: data,
-        content: [{ type: "text", text: `LTH Behavior: ${data.lthBehavior}\nExchange Pressure: ${data.exchangePressure}\nNet Exchange Flow: ${data.netExchangeFlow?.toFixed(2)} BTC\nMVRV: ${data.mvrv?.toFixed(2)}\nRegime: ${data.cycleRegime}\n${data.impliedPositioning}` }],
-      };
-    }
-  );
-
-  server.tool("get_entry_risk",
-    "Returns whether current BTC on-chain metrics suggest a high or low risk entry point.",
-    inputSchema,
-    async () => {
-      const data = await getCycleData();
-      return {
-        structuredContent: data,
-        content: [{ type: "text", text: `Entry Risk: ${data.entryRisk}\nScore: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nExchange Pressure: ${data.exchangePressure}\n${data.historicalContext}\n${data.impliedPositioning}` }],
-      };
-    }
-  );
-
-  server.tool("compare_to_2021_top",
-    "Compares current BTC on-chain metrics to the 2021 cycle top readings.",
-    inputSchema,
-    async () => {
-      const data = await getCycleData();
-      return {
-        structuredContent: data,
-        content: [{ type: "text", text: `Current vs 2021 Cycle Top:\nCurrent MVRV: ${data.mvrv?.toFixed(2)} vs 2021 Top: 8.01\nCurrent Score: ${data.regimeScore}/100 vs 2021 Top: 94/100\nCurrent Regime: ${data.cycleRegime} vs 2021: Distribution\nCurrent Exchange Pressure: ${data.exchangePressure}\n${data.historicalContext}` }],
-      };
-    }
-  );
-
-  server.tool("get_nupl_sentiment",
-    "Returns current Bitcoin market sentiment using MVRV and exchange flow as proxy indicators.",
-    inputSchema,
-    async () => {
-      const data = await getCycleData();
-      const sentiment =
-        data.regimeScore >= 80 ? "Euphoria" :
-        data.regimeScore >= 65 ? "Belief" :
-        data.regimeScore >= 50 ? "Optimism" :
-        data.regimeScore >= 30 ? "Hope" : "Capitulation";
-      return {
-        structuredContent: { ...data, sentiment },
-        content: [{ type: "text", text: `Market Sentiment: ${sentiment}\nRegime Score: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nExchange Pressure: ${data.exchangePressure}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nRegime: ${data.cycleRegime}\nRisk: ${data.entryRisk}` }],
-      };
-    }
-  );
-
-  return server;
+  switch (toolName) {
+    case "get_btc_cycle_regime":
+      return `BTC Cycle Regime: ${data.cycleRegime} (Score: ${data.regimeScore}/100)\nMVRV: ${data.mvrv?.toFixed(2)} | Price: $${data.price?.toFixed(0)} | ROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nExchange Pressure: ${data.exchangePressure}\nEntry Risk: ${data.entryRisk}\nLTH Behavior: ${data.lthBehavior}\n${data.historicalContext}\nPositioning: ${data.impliedPositioning}\nData as of: ${data.asOf}`;
+    case "get_lth_behavior":
+      return `LTH Behavior: ${data.lthBehavior}\nExchange Pressure: ${data.exchangePressure}\nNet Exchange Flow: ${data.netExchangeFlow?.toFixed(2)} BTC\nMVRV: ${data.mvrv?.toFixed(2)}\nRegime: ${data.cycleRegime}\n${data.impliedPositioning}`;
+    case "get_entry_risk":
+      return `Entry Risk: ${data.entryRisk}\nScore: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nExchange Pressure: ${data.exchangePressure}\n${data.historicalContext}\n${data.impliedPositioning}`;
+    case "compare_to_2021_top":
+      return `Current vs 2021 Cycle Top:\nCurrent MVRV: ${data.mvrv?.toFixed(2)} vs 2021 Top: 8.01\nCurrent Score: ${data.regimeScore}/100 vs 2021 Top: 94/100\nCurrent Regime: ${data.cycleRegime} vs 2021: Distribution\nCurrent Exchange Pressure: ${data.exchangePressure}\n${data.historicalContext}`;
+    case "get_nupl_sentiment":
+      return `Market Sentiment: ${sentiment}\nRegime Score: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nExchange Pressure: ${data.exchangePressure}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nRegime: ${data.cycleRegime}\nRisk: ${data.entryRisk}`;
+    default:
+      return `BTC Cycle Regime: ${data.cycleRegime} (Score: ${data.regimeScore}/100)`;
+  }
 }
 
 app.post("/mcp", async (req, res) => {
-  const server = createServer();
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
+  const body = req.body;
+
+  res.setHeader("Content-Type", "text/event-stream");
+
+  const sendEvent = (data) => {
+    res.write(`event: message\ndata: ${JSON.stringify(data)}\n\n`);
+    res.end();
+  };
+
+  try {
+    if (body.method === "initialize") {
+      return sendEvent({
+        jsonrpc: "2.0",
+        id: body.id,
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: { tools: {} },
+          serverInfo: { name: "btc-cycle-intelligence", version: "1.0.0" }
+        }
+      });
+    }
+
+    if (body.method === "tools/list") {
+      return sendEvent({
+        jsonrpc: "2.0",
+        id: body.id,
+        result: { tools: TOOLS }
+      });
+    }
+
+    if (body.method === "tools/call") {
+      const data = await getCycleData();
+      const text = formatResponse(body.params?.name, data);
+      const structuredContent = body.params?.name === "get_nupl_sentiment"
+        ? { ...data, sentiment: data.regimeScore >= 80 ? "Euphoria" : data.regimeScore >= 65 ? "Belief" : data.regimeScore >= 50 ? "Optimism" : data.regimeScore >= 30 ? "Hope" : "Capitulation" }
+        : data;
+
+      return sendEvent({
+        jsonrpc: "2.0",
+        id: body.id,
+        result: {
+          structuredContent,
+          content: [{ type: "text", text }]
+        }
+      });
+    }
+
+    sendEvent({ jsonrpc: "2.0", id: body.id, result: {} });
+
+  } catch (error) {
+    sendEvent({
+      jsonrpc: "2.0",
+      id: body.id,
+      error: { code: -32603, message: error.message }
+    });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
