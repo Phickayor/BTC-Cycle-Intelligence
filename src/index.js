@@ -194,6 +194,15 @@ function formatResponse(toolName, data) {
   }
 }
 
+// Health check routes — keeps Railway awake
+app.get("/", (req, res) => {
+  res.json({ status: "ok", name: "btc-cycle-intelligence", version: "1.0.0" });
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 app.post("/mcp", async (req, res) => {
   const body = req.body;
 
