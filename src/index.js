@@ -186,7 +186,7 @@ function formatResponse(toolName, data) {
     case "get_entry_risk":
       return `Entry Risk: ${data.entryRisk}\nScore: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nExchange Pressure: ${data.exchangePressure}\n${data.historicalContext}\n${data.impliedPositioning}`;
     case "compare_to_2021_top":
-      return `Current vs 2021 Cycle Top:\nCurrent MVRV: ${data.mvrv?.toFixed(2)} vs 2021 Top: 8.01\nCurrent Score: ${data.regimeScore}/100 vs 2021 Top: 94/100\nCurrent Regime: ${data.cycleRegime} vs 2021: Distribution\nCurrent Exchange Pressure: ${data.exchangePressure}\n${data.historicalContext}`;
+      return `Current vs 2021 Cycle Top:\nCurrent MVRV: ${data.mvrv?.toFixed(2)} vs 2021 Top: 3.96\nCurrent Score: ${data.regimeScore}/100 vs 2021 Top: 94/100\nCurrent Regime: ${data.cycleRegime} vs 2021: Distribution\nCurrent Exchange Pressure: ${data.exchangePressure}\n${data.historicalContext}`;
     case "get_nupl_sentiment":
       return `Market Sentiment: ${sentiment}\nRegime Score: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nExchange Pressure: ${data.exchangePressure}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nRegime: ${data.cycleRegime}\nRisk: ${data.entryRisk}`;
     default:
@@ -265,7 +265,6 @@ app.post("/mcp", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`BTC Cycle Intelligence MCP Server running on port ${PORT}`);
-  // Pre-warm cache on startup so first request is instant
   fetchBTCMetrics()
     .then(() => console.log("Cache pre-warmed successfully"))
     .catch((err) => console.log("Cache pre-warm failed:", err.message));
