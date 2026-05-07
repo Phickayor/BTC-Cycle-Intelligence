@@ -57,9 +57,36 @@ const TOOLS = [
   },
   {
     name: "compare_to_2021_top",
-    description: "Compares current BTC on-chain metrics to the 2021 cycle top readings.",
+    description: "Compares current BTC on-chain metrics to the 2021 cycle top readings. Returns side-by-side current vs November 2021 peak values including MVRV, regime score, exchange pressure, and cycle classification.",
     inputSchema: INPUT_SCHEMA,
-    outputSchema: OUTPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      properties: {
+        mvrv: { type: "number", description: "Current MVRV ratio" },
+        regimeScore: { type: "number", description: "Current composite cycle score 0-100" },
+        cycleRegime: { type: "string", description: "Current BTC cycle regime" },
+        entryRisk: { type: "string", description: "Current entry risk level" },
+        top2021: {
+          type: "object",
+          description: "Actual November 2021 cycle top metrics",
+          properties: {
+            mvrv: { type: "number", description: "MVRV at Nov 2021 peak (3.96)" },
+            regimeScore: { type: "number", description: "Regime score at Nov 2021 peak (94)" },
+            cycleRegime: { type: "string", description: "Cycle regime at Nov 2021 peak" },
+            entryRisk: { type: "string", description: "Entry risk at Nov 2021 peak" },
+            exchangePressure: { type: "string", description: "Exchange pressure at Nov 2021 peak" },
+            lthBehavior: { type: "string", description: "LTH behavior at Nov 2021 peak" },
+            date: { type: "string", description: "Date of Nov 2021 cycle top" }
+          }
+        },
+        mvrvDelta: { type: "number", description: "% difference between current and 2021 top MVRV" },
+        scoreDelta: { type: "number", description: "Difference between current and 2021 top regime score" },
+        verdict: { type: "string", description: "Comparative verdict vs 2021 top" },
+        asOf: { type: "string", description: "Data freshness date" },
+        confidence: { type: "number", description: "Confidence score 0-1" }
+      },
+      required: ["mvrv", "regimeScore", "cycleRegime", "top2021", "verdict", "asOf"]
+    },
   },
   {
     name: "get_nupl_sentiment",
@@ -186,7 +213,7 @@ function formatResponse(toolName, data) {
     case "get_entry_risk":
       return `Entry Risk: ${data.entryRisk}\nScore: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nExchange Pressure: ${data.exchangePressure}\n${data.historicalContext}\n${data.impliedPositioning}`;
     case "compare_to_2021_top":
-      return `Current vs 2021 Cycle Top:\nCurrent MVRV: ${data.mvrv?.toFixed(2)} vs 2021 Top: 3.96\nCurrent Score: ${data.regimeScore}/100 vs 2021 Top: 94/100\nCurrent Regime: ${data.cycleRegime} vs 2021: Distribution\nCurrent Exchange Pressure: ${data.exchangePressure}\n${data.historicalContext}`;
+      return `Current vs 2021 Cycle Top:\nCurrent MVRV: ${data.mvrv?.toFixed(2)} vs 2021 Top: 3.96\nCurrent Score: ${data.regimeScore}/100 vs 2021 Top: 94/100\nCurrent Regime: ${data.cycleRegime} vs 2021: Distribution\nCurrent Exchange Pressure: ${data.exchangePressure}\n${data.historicalContext}\nVerdict: ${data.mvrv < 3.96 ? `Current MVRV is ${((1 - data.mvrv/3.96)*100).toFixed(0)}% below the 2021 top - not yet at cycle peak levels` : "Current MVRV has exceeded 2021 top - extreme caution warranted"}`;
     case "get_nupl_sentiment":
       return `Market Sentiment: ${sentiment}\nRegime Score: ${data.regimeScore}/100\nMVRV: ${data.mvrv?.toFixed(2)}\nExchange Pressure: ${data.exchangePressure}\nROI 30d: ${(data.roi30d * 100)?.toFixed(1)}%\nRegime: ${data.cycleRegime}\nRisk: ${data.entryRisk}`;
     default:
@@ -237,9 +264,41 @@ app.post("/mcp", async (req, res) => {
     if (body.method === "tools/call") {
       const data = await getCycleData();
       const text = formatResponse(body.params?.name, data);
-      const structuredContent = body.params?.name === "get_nupl_sentiment"
-        ? { ...data, sentiment: data.regimeScore >= 80 ? "Euphoria" : data.regimeScore >= 65 ? "Belief" : data.regimeScore >= 50 ? "Optimism" : data.regimeScore >= 30 ? "Hope" : "Capitulation" }
-        : data;
+
+      let structuredContent = data;
+
+      if (body.params?.name === "get_nupl_sentiment") {
+        structuredContent = {
+          ...data,
+          sentiment: data.regimeScore >= 80 ? "Euphoria" :
+            data.regimeScore >= 65 ? "Belief" :
+            data.regimeScore >= 50 ? "Optimism" :
+            data.regimeScore >= 30 ? "Hope" : "Capitulation"
+        };
+      }
+
+      if (body.params?.name === "compare_to_2021_top") {
+        const mvrvDelta = data.mvrv
+          ? parseFloat(((data.mvrv - 3.96) / 3.96 * 100).toFixed(1))
+          : null;
+        structuredContent = {
+          ...data,
+          top2021: {
+            mvrv: 3.96,
+            regimeScore: 94,
+            cycleRegime: "Distribution",
+            entryRisk: "Extreme",
+            exchangePressure: "Inflow",
+            lthBehavior: "Distributing",
+            date: "2021-11-10"
+          },
+          mvrvDelta,
+          scoreDelta: data.regimeScore - 94,
+          verdict: data.mvrv < 3.96
+            ? `Current MVRV (${data.mvrv?.toFixed(2)}) is ${((1 - data.mvrv/3.96)*100).toFixed(0)}% below the 2021 top of 3.96 - not yet at cycle peak levels`
+            : `Current MVRV (${data.mvrv?.toFixed(2)}) has exceeded the 2021 top of 3.96 - extreme caution warranted`
+        };
+      }
 
       return sendEvent({
         jsonrpc: "2.0",
